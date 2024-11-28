@@ -31,6 +31,7 @@ pub mod pallet {
     use frame::traits::Dispatchable;
 
 
+
     use super::*;
 
     type CallHash = [u8; 32];
@@ -48,6 +49,11 @@ pub mod pallet {
             + Dispatchable<RuntimeOrigin = Self::RuntimeOrigin, PostInfo = PostDispatchInfo>
             + GetDispatchInfo
             + From<frame_system::Call<Self>>;
+        type MaxSignatories: Get<u32>;
+
+  
+
+
     }
 
     #[pallet::storage]
@@ -56,7 +62,7 @@ pub mod pallet {
         _,
         Blake2_128Concat,
         T::AccountId,
-        BoundedVec<T::AccountId, ConstU32<100>>,
+        BoundedVec<T::AccountId, MaxSignatories>,
         ValueQuery,
     >;
 

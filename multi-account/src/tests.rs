@@ -4,6 +4,7 @@ use frame::log::*;
 use frame::testing_prelude::assert_noop;
 use frame::traits::Zero;
 
+
 pub type MultiSigAccount = (u64, Vec<u64>, u16);
 
 #[test]
@@ -35,6 +36,13 @@ fn it_should_create_an_account_in_database() {
         frame_system::Pallet::<Test>::assert_has_event(event.clone().into());
         frame_system::Pallet::<Test>::assert_last_event(event.into());
         create_a_multisig_account();
+    })
+}
+
+#[test]
+fn should_be_able_to_transfer_to_multi_sig_account(){
+    new_test_ext().execute_with(|| {
+        //frame_system::Pallet::<Test>
     })
 }
 
