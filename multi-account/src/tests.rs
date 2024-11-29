@@ -1,8 +1,7 @@
 use crate::{mock::*, *};
-use frame::deps::frame_support::assert_ok;
-use frame::log::*;
-use frame::testing_prelude::assert_noop;
-use frame::traits::Zero;
+use frame_support::{assert_noop, assert_ok};
+use sp_runtime::traits::Zero;
+
 
 
 pub type MultiSigAccount = (u64, Vec<u64>, u16);
@@ -14,7 +13,7 @@ fn it_should_create_an_account_in_database() {
         let mut other_signatories = vec![2, 3, 4, 5, 6];
         let threshold = 2;
         let id = MultiAccount::multi_account_id(other_signatories.as_slice(), threshold);
-        frame::log::debug!("id: {:?}", id);
+        //frame::log::debug!("id: {:?}", id);
 
         assert_ok!(MultiAccount::register_account(
             origin,
@@ -53,7 +52,7 @@ fn it_should_create_a_call_succesfully_if_signatory() {
         let other_signatories = vec![2, 3, 4, 5, 6];
         let threshold = 2;
         let id = MultiAccount::multi_account_id(other_signatories.as_slice(), threshold);
-        frame::log::debug!("id: {:?}", id);
+        //frame::log::debug!("id: {:?}", id);
         // register an account and its signatories
         MultiAccount::register_account(origin.clone(), id, other_signatories.clone(), threshold)
             .expect("This should not fail under no circumstance");
@@ -97,7 +96,7 @@ fn create_a_multisig_account() -> MultiSigAccount {
         let other_signatories = vec![2, 3, 4, 5, 6];
         let threshold = 2;
         let id = MultiAccount::multi_account_id(other_signatories.as_slice(), threshold);
-        debug!("id: {:?}", id);
+        //debug!("id: {:?}", id);
         MultiAccount::register_account(origin, id, other_signatories.clone(), threshold)
             .expect("This should not have failed");
         (id, other_signatories, threshold)

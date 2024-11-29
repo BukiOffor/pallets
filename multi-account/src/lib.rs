@@ -1,19 +1,31 @@
+// All pallets must be configured for `no_std`.
 #![cfg_attr(not(feature = "std"), no_std)]
 
+// Re-export pallet items so that they can be accessed from the crate namespace.
 pub use pallet::*;
-
-use frame::prelude::*;
-
 #[cfg(test)]
 mod mock;
 
 #[cfg(test)]
 mod tests;
 
-pub mod weights;
+//mod weights;
 
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
+#[frame_support::pallet]
+pub mod pallet {
+ 
+use super::*;
+
+ use frame_support::pallet_prelude::*;
+ use frame_system::pallet_prelude::*;
+
+ use frame_support::{
+  dispatch::{GetDispatchInfo, PostDispatchInfo},
+  Parameter,
+};
+use sp_runtime::traits::{Dispatchable, TrailingZeroInput};
+
+
 
 // create an account for a set of signatories in this pallet
 // set account nonce to 0
@@ -21,52 +33,39 @@ mod benchmarking;
 // allow the account to hold balances.
 // dispatch any call if the signature threshold is met.
 
-#[frame::pallet]
-pub mod pallet {
 
-    use frame::deps::frame_support::{
-        dispatch::{GetDispatchInfo, PostDispatchInfo},
-        Parameter,
-    };
-    use frame::traits::Dispatchable;
+type CallHash = [u8; 32];
 
+ #[pallet::pallet]
+ pub struct Pallet<T>(_);
 
+/// Configure the pallet by specifying the parameters and types on which it depends.
+#[pallet::config]
+pub trait Config: frame_system::Config {
+ /// A type representing the weights required by the dispatchables of this pallet.
+ type WeightInfo;
 
-    use super::*;
+ type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
-    type CallHash = [u8; 32];
+ /// The overarching call type.
+ type RuntimeCall: Parameter
+     + Dispatchable<RuntimeOrigin = Self::RuntimeOrigin, PostInfo = PostDispatchInfo>
+     + GetDispatchInfo
+     + From<frame_system::Call<Self>>;
+ type MaxSignatories: Get<u32>;
+} 
 
-    /// Configure the pallet by specifying the parameters and types on which it depends.
-    #[pallet::config]
-    pub trait Config: frame_system::Config {
-        /// A type representing the weights required by the dispatchables of this pallet.
-        type WeightInfo: crate::weights::WeightInfo;
-
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-
-        /// The overarching call type.
-        type RuntimeCall: Parameter
-            + Dispatchable<RuntimeOrigin = Self::RuntimeOrigin, PostInfo = PostDispatchInfo>
-            + GetDispatchInfo
-            + From<frame_system::Call<Self>>;
-        type MaxSignatories: Get<u32>;
-
-  
-
-
-    }
-
-    #[pallet::storage]
+#[pallet::storage]
     #[pallet::getter(fn get_account)]
     pub type Account<T: Config> = StorageMap<
         _,
         Blake2_128Concat,
         T::AccountId,
-        BoundedVec<T::AccountId, MaxSignatories>,
+        BoundedVec<T::AccountId, T::MaxSignatories>,
         ValueQuery,
     >;
 
-    /// This is a terrible use case storing this data seperately on the blockchain.
+ /// This is a terrible use case storing this data seperately on the blockchain.
     /// because this will require making multiple calls to fetch information that can be
     /// fetched with a single call. The `Account` storage should be set to a `NStorageMap`
     /// that will be able to store all these information.
@@ -74,7 +73,7 @@ pub mod pallet {
     #[pallet::getter(fn get_threshold)]
     pub type Threshold<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, u16, ValueQuery>;
 
-    /// This storage location is a double map of MultiAccount Id -> Hash(Call) -> array of signatories that have voted yes
+     /// This storage location is a double map of MultiAccount Id -> Hash(Call) -> array of signatories that have voted yes
     /// The bounded vec is important because it keeps track of accounts that have voted yes on a transaction
     /// with the bounded vec we can be sure that there is no double voting.
     #[pallet::storage]
@@ -108,8 +107,7 @@ pub mod pallet {
         },
     }
 
-    #[pallet::pallet]
-    pub struct Pallet<T>(_);
+
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
@@ -149,7 +147,7 @@ pub mod pallet {
                 signatories.into_inner().binary_search(&who).is_ok(),
                 Error::<T>::SignerIsNotApproved
             );
-            let hash = call.using_encoded(frame::deps::sp_io::hashing::blake2_256);
+            let hash = call.using_encoded(sp_io::hashing::blake2_256);
             let approvals = BoundedVec::try_from(vec![who.clone()])
                 .map_err(|_| Error::<T>::TooManySignatories)?;
             <Calls<T>>::insert(&id, &hash, approvals);
@@ -172,7 +170,7 @@ pub mod pallet {
             let approvals_needed = <Threshold<T>>::get(&id);
 
             let mut number_of_approvals = 0;
-            let hash = &call.using_encoded(frame::deps::sp_io::hashing::blake2_256);
+            let hash = &call.using_encoded(sp_io::hashing::blake2_256);
             <Calls<T>>::try_mutate(&id, hash, |sig| -> DispatchResult {
                 // the ensure_sorted_and_insert already makes a check to confirm if an account id
                 // already exists in the bounded vec. so we can be sure that a double vote will not occur.
@@ -197,8 +195,8 @@ pub mod pallet {
         /// NOTE: `who` must be sorted. If it is not, then you'll get the wrong answer.
         pub fn multi_account_id(who: &[T::AccountId], threshold: u16) -> T::AccountId {
             let entropy = (b"modlpy/utilisuba", who, threshold)
-                .using_encoded(frame::deps::sp_io::hashing::blake2_256);
-            Decode::decode(&mut frame::traits::TrailingZeroInput::new(entropy.as_ref()))
+                .using_encoded(sp_io::hashing::blake2_256);
+            Decode::decode(&mut TrailingZeroInput::new(entropy.as_ref()))
                 .expect("infinite length input; no invalid inputs for type; qed")
         }
 
@@ -245,4 +243,6 @@ pub mod pallet {
         SignerIsNotApproved
 
     }
+
 }
+

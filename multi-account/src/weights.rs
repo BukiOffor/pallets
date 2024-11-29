@@ -29,7 +29,7 @@
 #![allow(unused_parens)]
 #![allow(unused_imports)]
 
-use frame::deps::{frame_support::{traits::Get, weights::{Weight, constants::RocksDbWeight}}, frame_system};
+use frame_support::{traits::Get, weights::{Weight, constants::RocksDbWeight}};
 use core::marker::PhantomData;
 
 /// Weight functions needed for pallet_template.
@@ -40,6 +40,8 @@ pub trait WeightInfo {
 
 /// Weights for pallet_template using the Substrate node and recommended hardware.
 pub struct SubstrateWeight<T>(PhantomData<T>);
+
+
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: TemplateModule Something (r:0 w:1)
 	/// Proof: TemplateModule Something (max_values: Some(1), max_size: Some(4), added: 499, mode: MaxEncodedLen)
