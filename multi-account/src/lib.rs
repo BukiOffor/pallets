@@ -98,6 +98,11 @@ pub mod pallet {
             signatories: Vec<T::AccountId>,
             threshold: u16,
         },
+        Call {
+            id: T::AccountId,
+            hash: CallHash,
+            signatories: Vec<T::AccountId>,
+        }
     }
 
     #[pallet::call]
@@ -161,7 +166,7 @@ pub mod pallet {
                 Error::<T>::SignerIsNotApproved
             );
             let approvals_needed = <Threshold<T>>::get(&id);
-
+            let mut signers: Vec<_> = Vec::new();
             let mut number_of_approvals = 0;
             let hash = &call.using_encoded(sp_io::hashing::blake2_256);
             <Calls<T>>::try_mutate(&id, hash, |sig| -> DispatchResultWithPostInfo {
@@ -176,6 +181,7 @@ pub mod pallet {
                 number_of_approvals = sig.as_slice().len() as u16;
                 let sorted_vec =
                     Self::ensure_sorted_and_insert(sig.as_slice().to_vec(), who.clone())?;
+                signers.extend(sorted_vec.clone());
                 *sig =
                     BoundedVec::try_from(sorted_vec).map_err(|_| Error::<T>::TooManySignatories)?;
                 Ok(().into())
@@ -183,10 +189,15 @@ pub mod pallet {
 
             if (number_of_approvals + 1) == approvals_needed {
                 //call.dispatch(<T as frame_system::Config>::RuntimeOrigin::signed(id));
-                let result = call.dispatch(RawOrigin::Signed(id).into());
+                let result = call.dispatch(RawOrigin::Signed(id.clone()).into());
                 result.map_err(|err|{          
                     return err;
-                })?;            
+                })?; 
+                Self::deposit_event(Event::Call {
+                    id,
+                    signatories: signers,
+                    hash: hash.clone(),
+                });           
             }
 
             Ok(().into())
