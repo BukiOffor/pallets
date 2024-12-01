@@ -107,7 +107,7 @@ pub mod pallet {
             id: T::AccountId,
             hash: CallHash,
             signatories: Vec<T::AccountId>,
-        }
+        },
     }
 
     #[pallet::call]
@@ -179,9 +179,13 @@ pub mod pallet {
             let mut signers: Vec<_> = Vec::new();
             let mut number_of_approvals = 0;
             let hash = &call.using_encoded(sp_io::hashing::blake2_256);
+            // ensure!(
+            //     <Calls<T>>::contains_key(&id, hash),
+            //     Error::<T>::NotFound
+            // );
             <Calls<T>>::try_mutate(&id, hash, |sig| -> DispatchResultWithPostInfo {
                 // if the number of approvals needed has passed and the call has been dispatched
-                // there is no need to add 32 bytes in storage thar is of no use
+                // there is no need to add 32 bytes in storage that is of no use
                 // so we return early here
                 if sig.as_slice().len() as u16 == approvals_needed {
                     return Err(Error::<T>::DispatchHasAlreadyOccured.into());
@@ -206,14 +210,16 @@ pub mod pallet {
             if (number_of_approvals + 1) == approvals_needed {
                 //call.dispatch(<T as frame_system::Config>::RuntimeOrigin::signed(id));
                 let result = call.dispatch(RawOrigin::Signed(id.clone()).into());
-                result.map_err(|err|{          
+                result.map_err(|err| {
                     return err;
-                })?; 
+                })?;
                 Self::deposit_event(Event::Call {
-                    id,
+                    id: id.clone(),
                     signatories: signers,
                     hash: hash.clone(),
-                });           
+                });
+                // remove call from storage because of space ??
+                // <Calls<T>>::remove(id.clone(), hash);
             }
 
             Ok(().into())

@@ -122,25 +122,33 @@ fn should_be_able_to_transfer_to_multi_sig_account() {
             id,
             call.clone()
         ));
-        // Alice created the call, so she should not be able to approve because she approves 
+        // Alice created the call, so she should not be able to approve because she approves
         // automatically at the point of creation.❌ ❌ ❌
         assert_noop!(
             MultiAccount::approve_or_dispatch_call(origin.clone(), id, call.clone()),
             crate::Error::<Test>::SenderInSignatories
         );
-        // second approval from ✅ ✅ ✅
-        assert_ok!(MultiAccount::approve_or_dispatch_call(RuntimeOrigin::signed(BOB), id, call.clone()));
+        // second approval from bob ✅ ✅ ✅
+        assert_ok!(MultiAccount::approve_or_dispatch_call(
+            RuntimeOrigin::signed(BOB),
+            id,
+            call.clone()
+        ));
         // Transaction should fail because bob has approves the call previously
-        // ❌ ❌ ❌ 
+        // ❌ ❌ ❌
         assert_noop!(
             MultiAccount::approve_or_dispatch_call(RuntimeOrigin::signed(BOB), id, call.clone()),
             crate::Error::<Test>::SenderInSignatories
         );
         // Charlie approves a transaction to be dispatched
         // ✅ ✅ ✅
-        assert_ok!(MultiAccount::approve_or_dispatch_call(RuntimeOrigin::signed(CHARLIE), id, call.clone()));
+        assert_ok!(MultiAccount::approve_or_dispatch_call(
+            RuntimeOrigin::signed(CHARLIE),
+            id,
+            call.clone()
+        ));
 
-        // Transaction should fail because the call has already been dispatched regardless of the caller ❌ ❌ ❌ 
+        // Transaction should fail because the call has already been dispatched regardless of the caller ❌ ❌ ❌
         assert_noop!(
             MultiAccount::approve_or_dispatch_call(RuntimeOrigin::signed(BOB), id, call.clone()),
             crate::Error::<Test>::DispatchHasAlreadyOccured
@@ -148,7 +156,7 @@ fn should_be_able_to_transfer_to_multi_sig_account() {
 
         // Confirm that a transaction actually occured by checking bob's balance ✅ ✅ ✅
         let bob_balance = Balances::balance(&BOB);
-        assert_eq!(bob_balance,transfer_amount);
+        assert_eq!(bob_balance, transfer_amount);
 
     })
 }
