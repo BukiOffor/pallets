@@ -98,6 +98,11 @@ pub mod pallet {
             signatories: Vec<T::AccountId>,
             threshold: u16,
         },
+        Approval {
+            id: T::AccountId,
+            signer: T::AccountId,
+            hash: CallHash,
+        },
         Call {
             id: T::AccountId,
             hash: CallHash,
@@ -145,10 +150,15 @@ pub mod pallet {
             );
             let hash = call.using_encoded(sp_io::hashing::blake2_256);
 
-            // whoever creates the call has already approved it
+            // whoever creates the call has already approved it because we are inserting the caller into the vec
             let approvals = BoundedVec::try_from(vec![who.clone()])
                 .map_err(|_| Error::<T>::TooManySignatories)?;
             <Calls<T>>::insert(&id, &hash, approvals);
+            Self::deposit_event(Event::Approval {
+                id,
+                signer: who,
+                hash: hash,
+            });
             Ok(())
         }
 
@@ -186,6 +196,12 @@ pub mod pallet {
                     BoundedVec::try_from(sorted_vec).map_err(|_| Error::<T>::TooManySignatories)?;
                 Ok(().into())
             })?;
+
+            Self::deposit_event(Event::Approval {
+                id: id.clone(),
+                signer: who.clone(),
+                hash: hash.clone(),
+            });
 
             if (number_of_approvals + 1) == approvals_needed {
                 //call.dispatch(<T as frame_system::Config>::RuntimeOrigin::signed(id));
