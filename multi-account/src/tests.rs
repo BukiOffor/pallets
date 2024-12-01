@@ -1,10 +1,14 @@
 use crate::{mock::*, *};
 use frame_support::{assert_noop, assert_ok};
 use sp_runtime::traits::Zero;
+//use frame_support::traits::fungible::Mutate;
+use frame_support::traits::fungible::Inspect;
 
-
-
-pub type MultiSigAccount = (u64, Vec<u64>, u16);
+const ALICE: u64 = 1337;
+const BOB: u64 = 2000;
+const CHARLIE: u64 = 3000;
+const OSCAR: u64 = 10000;
+const FREE_BALANCE: u64 = 10_000_000;
 
 #[test]
 fn it_should_create_an_account_in_database() {
@@ -13,8 +17,7 @@ fn it_should_create_an_account_in_database() {
         let mut other_signatories = vec![2, 3, 4, 5, 6];
         let threshold = 2;
         let id = MultiAccount::multi_account_id(other_signatories.as_slice(), threshold);
-        //frame::log::debug!("id: {:?}", id);
-
+        println!("id: {:?}", id);
         assert_ok!(MultiAccount::register_account(
             origin,
             id,
@@ -34,14 +37,6 @@ fn it_should_create_an_account_in_database() {
         frame_system::Pallet::<Test>::finalize();
         frame_system::Pallet::<Test>::assert_has_event(event.clone().into());
         frame_system::Pallet::<Test>::assert_last_event(event.into());
-        create_a_multisig_account();
-    })
-}
-
-#[test]
-fn should_be_able_to_transfer_to_multi_sig_account(){
-    new_test_ext().execute_with(|| {
-        //frame_system::Pallet::<Test>
     })
 }
 
@@ -52,7 +47,7 @@ fn it_should_create_a_call_succesfully_if_signatory() {
         let other_signatories = vec![2, 3, 4, 5, 6];
         let threshold = 2;
         let id = MultiAccount::multi_account_id(other_signatories.as_slice(), threshold);
-        //frame::log::debug!("id: {:?}", id);
+        println!("id: {:?}", id);
         // register an account and its signatories
         MultiAccount::register_account(origin.clone(), id, other_signatories.clone(), threshold)
             .expect("This should not fail under no circumstance");
@@ -90,15 +85,70 @@ fn should_fail_to_create_a_call_if_not_signatory() {
     })
 }
 
-fn create_a_multisig_account() -> MultiSigAccount {
+#[test]
+fn should_be_able_to_transfer_to_multi_sig_account() {
     new_test_ext().execute_with(|| {
-        let origin = RuntimeOrigin::signed(1);
-        let other_signatories = vec![2, 3, 4, 5, 6];
-        let threshold = 2;
+        let origin = RuntimeOrigin::signed(ALICE);
+        let mut other_signatories = vec![BOB, OSCAR, CHARLIE];
+        other_signatories.sort();
+        let threshold = 3;
+        // create a multisig account
         let id = MultiAccount::multi_account_id(other_signatories.as_slice(), threshold);
-        //debug!("id: {:?}", id);
-        MultiAccount::register_account(origin, id, other_signatories.clone(), threshold)
+        // register our multi sig account
+        MultiAccount::register_account(origin.clone(), id, other_signatories.clone(), threshold)
             .expect("This should not have failed");
-        (id, other_signatories, threshold)
+        let root: RuntimeOrigin = RuntimeOrigin::root();
+
+        // Set the balance of our multi account to 10,000,000
+        Balances::force_set_balance(root, id, FREE_BALANCE.into())
+            .expect("Balance should have been set successfully");
+
+        // confirm that the multi account has the balance that was just set
+        let balance = Balances::balance(&id);
+        assert_eq!(balance, FREE_BALANCE);
+
+        let transfer_amount = 50000_u64;
+        // perform a transfer to another account
+        let call: Box<RuntimeCall> = Box::new(RuntimeCall::Balances(
+            pallet_balances::Call::<Test>::transfer_keep_alive {
+                dest: BOB,
+                value: transfer_amount,
+            },
+        ));
+        // create a call to transfer some balance to a BOB
+        // first approval ✅ ✅ ✅
+        assert_ok!(MultiAccount::account_create_call(
+            origin.clone(),
+            id,
+            call.clone()
+        ));
+        // Alice created the call, so she should not be able to approve because she approves 
+        // automatically at the point of creation.❌ ❌ ❌
+        assert_noop!(
+            MultiAccount::approve_or_dispatch_call(origin.clone(), id, call.clone()),
+            crate::Error::<Test>::SenderInSignatories
+        );
+        // second approval from ✅ ✅ ✅
+        assert_ok!(MultiAccount::approve_or_dispatch_call(RuntimeOrigin::signed(BOB), id, call.clone()));
+        // Transaction should fail because bob has approves the call previously
+        // ❌ ❌ ❌ 
+        assert_noop!(
+            MultiAccount::approve_or_dispatch_call(RuntimeOrigin::signed(BOB), id, call.clone()),
+            crate::Error::<Test>::SenderInSignatories
+        );
+        // Charlie approves a transaction to be dispatched
+        // ✅ ✅ ✅
+        assert_ok!(MultiAccount::approve_or_dispatch_call(RuntimeOrigin::signed(CHARLIE), id, call.clone()));
+
+        // Transaction should fail because the call has already been dispatched regardless of the caller ❌ ❌ ❌ 
+        assert_noop!(
+            MultiAccount::approve_or_dispatch_call(RuntimeOrigin::signed(BOB), id, call.clone()),
+            crate::Error::<Test>::DispatchHasAlreadyOccured
+        );
+
+        // Confirm that a transaction actually occured by checking bob's balance ✅ ✅ ✅
+        let bob_balance = Balances::balance(&BOB);
+        assert_eq!(bob_balance,transfer_amount);
+
     })
 }
